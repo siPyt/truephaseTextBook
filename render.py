@@ -1,23 +1,88 @@
 # -*- coding: utf-8 -*-
 """Renderer: turns authored chapter dicts into Platypus story pages."""
-import sys
+import sys, os
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / 'figures'))
 from engine import *
 import engine, figs
-from reportlab.platypus import Paragraph, Spacer, PageBreak, NextPageTemplate, Table, TableStyle, KeepTogether
+from reportlab.platypus import Paragraph, Spacer, PageBreak, NextPageTemplate, Table, TableStyle, KeepTogether, Image
 from reportlab.lib.colors import HexColor, white
+from reportlab.lib.utils import ImageReader
 
 OH="\u03a9"; MU="\u00b5"; TAU="\u03c4"; DEG="\u00b0"; AP="\u2248"; TIMES="\u00d7"
 
-def F(name,caption,num,gh=44,gw=78):
+# Map chapter numbers to their field photographs and captions
+CHAPTER_PHOTOS = {
+    3: (
+        ["ch3.jpg", "ch3.jpeg", "panel.jpg", "panel.jpeg", "image_87dbcf2a.jpg"],
+        "FIELD PRACTICE · Parallel branch circuits, neutral bus termination, and equipment grounding conductors in a 120/240 V distribution panel.",
+        2.35 * inch
+    ),
+    10: (
+        ["ch10.jpg", "ch10.jpeg", "substation.jpg", "substation.jpeg", "high-voltage_power_transformer_at_electrical_substation._high-voltage_power_transformer_and_electrical_substation_infrastructure_surrounded_by_transmission_equipment_and_power_lines..jpg"],
+        "FIELD PRACTICE · High-voltage three-phase substation power transformer with high-voltage bushings, forced-air radiator fans, and oil conservator tank.",
+        2.55 * inch
+    ),
+    11: (
+        ["motor.jpeg", "motor.jpg", "ch11.jpg", "ch11.jpeg"],
+        "FIELD PRACTICE · Industrial induction motor installation, frame cooling ribs, and terminal box connection.",
+        2.55 * inch
+    ),
+    17: (
+        ['switchgear.jpg', 'switchgear.jpeg', 'ch17.jpg', 'ch17.jpeg'],
+        "FIELD PRACTICE · Industrial three-phase low-voltage switchgear lineup with draw-out air circuit breakers, status indicators, and local metering.",
+        3.25 * inch
+    ),
+    18: (
+        ["receptacle.jpeg", "receptacle.jpg", "ch18.jpg", "ch18.jpeg"],
+        "FIELD PRACTICE · Branch-circuit receptacle termination, polarized line/neutral conductors, and equipment grounding path.",
+        2.55 * inch
+    ),
+    20: (
+        ["ch20.jpg", "ch20.jpeg", "penthouse.jpg", "penthouse.jpeg", "image_68fe44ed.jpg"],
+        "FIELD PRACTICE · Clean installation, accurate documentation, and disciplined diagnostic habits build lasting professional competence.",
+        2.35 * inch
+    ),
+}
+
+def photo_block(filenames, caption, max_h=2.5*inch):
+    for fname in filenames:
+        for folder in (ROOT, ROOT / "figures", ROOT / "images"):
+            p = folder / fname
+            if p.exists():
+                ir = ImageReader(str(p))
+                iw, ih = ir.getSize()
+                w = TW - 2
+                h = w * (float(ih) / float(iw))
+                if h > max_h:
+                    h = max_h
+                    w = h * (float(iw) / float(ih))
+                img = Image(str(p), width=w, height=h)
+                cap = Paragraph('<font name="Mono" size="7" color="#A8272C">PLATE</font>&nbsp;&nbsp;' + sx(caption), st['cap'])
+                t = Table([[img], [cap]], colWidths=[TW])
+                t.setStyle(TableStyle([
+                    ('ALIGN', (0,0), (0,0), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                    ('BACKGROUND', (0,0), (0,0), HexColor('#FFFFFF')),
+                    ('BOX', (0,0), (0,0), 0.8, RULE),
+                    ('TOPPADDING', (0,0), (0,0), 6),
+                    ('BOTTOMPADDING', (0,0), (0,0), 6),
+                    ('TOPPADDING', (0,1), (0,1), 4),
+                    ('BOTTOMPADDING', (0,1), (0,1), 2),
+                    ('LEFTPADDING', (0,0), (-1,-1), 0),
+                    ('RIGHTPADDING', (0,0), (-1,-1), 0),
+                ]))
+                return [Spacer(1, 6), KeepTogether([t]), Spacer(1, 8)]
+    return []
+
+def F(name,caption,num,gh=44,gw=94):
     return fig(getattr(figs,name),caption,num,gh=gh,gw=gw)
 
 def chapter_open(ch):
     o=[Marker('ch%d'%ch['n'],'%d. %s'%(ch['n'],ch['title']),0),
        Running('CHAPTER %d \u00b7 %s'%(ch['n'],ch['title'].upper())),
-       Spacer(1,26),
+       Spacer(1,22),
        Paragraph('CHAPTER %02d'%ch['n'],st['eyebrow']),
        Rule(ACC,1.6,w=58,pad=8), Spacer(1,8),
        Paragraph(sx(ch['title']),st['ctitle']),
@@ -53,6 +118,9 @@ def render_examples(ch):
     out=[H2('Worked examples'),
          T('Work each example with a pencil before reading the solution. Sketch the circuit, '
            'mark the reference node, and write the governing law before substituting numbers.')]
+    if ch['n'] in CHAPTER_PHOTOS:
+        fnames, cap, max_h = CHAPTER_PHOTOS[ch['n']]
+        out += photo_block(fnames, cap, max_h)
     for i,ex in enumerate(ch['examples']):
         rows=[[Paragraph('<font name="Util" size="7.6" color="#A8272C">EXAMPLE %d.%d</font>&nbsp;&nbsp;'
                '<font name="Util" size="8.6">%s</font>'%(ch['n'],i+1,sx(ex['title'])),st['panel'])]]
