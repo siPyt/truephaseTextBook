@@ -1,0 +1,4 @@
+reportlab
+pypdf
+
+Python 3.10+
